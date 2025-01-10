@@ -1,0 +1,28 @@
+controller_names:
+  - panda_arm_controller
+  - robotiq_gripper_controller
+  - robotiq_activation_controllery
+
+panda_arm_controller:
+  action_ns: follow_joint_trajectory
+  type: FollowJointTrajectory
+  default: true
+  joints:
+    - panda_joint1
+    - panda_joint2
+    - panda_joint3
+    - panda_joint4
+    - panda_joint5
+    - panda_joint6
+    - panda_joint7
+
+robotiq_gripper_controller:
+  ros__parameters:
+    default: true
+    joint: robotiq_85_left_knuckle_joint
+    use_effort_interface: true
+    use_speed_interface: true
+
+robotiq_activation_controller:
+  ros__parameters:
+    default: true

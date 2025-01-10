@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
+    <xacro:macro name="arm" params="name tip_link">
+        <group name="${name}">
+            <chain base_link="$(arg arm_id)_link0" tip_link="${tip_link}" />
+        </group>
+        <group_state name="ready" group="${name}">
+            <joint name="$(arg arm_id)_joint1" value="0" />
+            <joint name="$(arg arm_id)_joint2" value="${-pi/4}" />
+            <joint name="$(arg arm_id)_joint3" value="0" />
+            <joint name="$(arg arm_id)_joint4" value="${-3*pi/4}" />
+            <joint name="$(arg arm_id)_joint5" value="0" />
+            <joint name="$(arg arm_id)_joint6" value="${pi/2}" />
+            <joint name="$(arg arm_id)_joint7" value="${pi/4}" />
+        </group_state>
+        <group_state name="extended" group="${name}">
+            <joint name="$(arg arm_id)_joint1" value="0" />
+            <joint name="$(arg arm_id)_joint2" value="0" />
+            <joint name="$(arg arm_id)_joint3" value="0" />
+            <joint name="$(arg arm_id)_joint4" value="-0.1" />
+            <joint name="$(arg arm_id)_joint5" value="0" />
+            <joint name="$(arg arm_id)_joint6" value="${pi}" />
+            <joint name="$(arg arm_id)_joint7" value="${pi/4}" />
+        </group_state>
+	<virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="$(arg arm_id)_link0" />
+	<disable_collisions link1="$(arg arm_id)_link0" link2="$(arg arm_id)_link1" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link0" link2="$(arg arm_id)_link2" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link0" link2="$(arg arm_id)_link3" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link0" link2="$(arg arm_id)_link4" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link1" link2="$(arg arm_id)_link2" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link1" link2="$(arg arm_id)_link3" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link1" link2="$(arg arm_id)_link4" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link2" link2="$(arg arm_id)_link3" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link2" link2="$(arg arm_id)_link4" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link2" link2="$(arg arm_id)_link6" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link3" link2="$(arg arm_id)_link4" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link3" link2="$(arg arm_id)_link5" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link3" link2="$(arg arm_id)_link6" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link3" link2="$(arg arm_id)_link7" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link4" link2="$(arg arm_id)_link5" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link4" link2="$(arg arm_id)_link6" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link4" link2="$(arg arm_id)_link7" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link4" link2="$(arg arm_id)_link8" reason="Never"/>
+	<disable_collisions link1="$(arg arm_id)_link5" link2="$(arg arm_id)_link6" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link6" link2="$(arg arm_id)_link7" reason="Adjacent"/>
+	<disable_collisions link1="$(arg arm_id)_link6" link2="$(arg arm_id)_link8" reason="Default"/>
+	<disable_collisions link1="$(arg arm_id)_link7" link2="$(arg arm_id)_link8" reason="Adjacent"/>
+    </xacro:macro>
+
+</robot>

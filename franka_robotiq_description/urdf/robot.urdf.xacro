@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
+  <!-- Name of this panda -->
+  <xacro:arg name="arm_id" default="panda"/>
+  <!-- Should a franka_gripper be mounted at the flange?" -->
+  <xacro:arg name="robotiq_gripper" default="true"/>
+  <!-- IP address or hostname of the robot" -->
+  <xacro:arg name="robot_ip" default="192.168.0.4"/>
+  <!-- Use fake hardware for testing -->
+  <xacro:arg name="use_fake_hardware" default="true"/>
+  <!-- Use fake sensor commands for testing -->
+  <xacro:arg name="fake_sensor_commands" default="false"/>
+  <!-- Positional offset between $(arm_id)_hand -> $(arm_id)_hand_tcp [m]. Only used when hand:=true -->
+  <xacro:arg name="tcp_xyz" default="0 0 0.1034" />
+  <!-- Rotational offset between $(arm_id)_hand -> $(arm_id)_hand_tcp [rad]. Only used when hand:=true -->
+  <xacro:arg name="tcp_rpy" default="0 0 0" />
+
+  <!-- Robot Arm Description -->
+  <xacro:include filename="$(find franka_description)/robots/panda_arm.xacro"/>
+  <xacro:panda_arm arm_id="$(arg arm_id)" safety_distance="0.03"/>
+
+  <!-- RobotIQ Gripper Description -->
+  <xacro:if value="$(arg robotiq_gripper)">
+    <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro"/>
+    <xacro:robotiq_gripper name="RobotiqGripperHardwareInterface" prefix="" parent="$(arg arm_id)_link8" use_fake_hardware="$(arg use_fake_hardware)" fake_sensor_commands="$(arg fake_sensor_commands)">
+	
+  <!-- connection between panda arm and robotiq gripper -->
+  <origin xyz="0 0 0" rpy="0 0 -1.570796" />
+
+    </xacro:robotiq_gripper>
+  </xacro:if>
+
+  <!-- ROS 2 Control Tags -->
+  <xacro:include filename="$(find franka_description)/robots/panda_arm.ros2_control.xacro"/>
+  <xacro:panda_arm_ros2_control ns="$(arg arm_id)" robot_ip="$(arg robot_ip)" use_fake_hardware="$(arg use_fake_hardware)" fake_sensor_commands="$(arg fake_sensor_commands)"/>
+</robot>
