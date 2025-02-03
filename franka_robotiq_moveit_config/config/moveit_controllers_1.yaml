@@ -1,0 +1,19 @@
+controller_names:
+  - /panda/joint_trajectory_controller
+
+/panda/controller_manager:
+  joint_trajectory_controller:
+    type: FollowJointTrajectory
+
+/panda/joint_trajectory_controller:
+  default: true
+  type: FollowJointTrajectory
+  joints:
+    - panda_joint1
+    - panda_joint2
+    - panda_joint3
+    - panda_joint4
+    - panda_joint5
+    - panda_joint6
+    - panda_joint7
+  action_ns: /panda/joint_trajectory_controller/follow_joint_trajectory
