@@ -26,7 +26,7 @@
 	
   <!-- connection between panda arm and robotiq gripper -->
   <!-- origin xyz="0 0 0" rpy="0 0 -1.570796" / -->
-  <origin xyz="0 0 -0.125" rpy="0 0 -1.570796" />
+  <origin xyz="0 0 -0.15" rpy="0 0 -1.570796" /> <!-- panda_joint8 위치 offset에 대해 역방향으로 15cm 보정 -->
     </xacro:robotiq_gripper>
   </xacro:if>
 

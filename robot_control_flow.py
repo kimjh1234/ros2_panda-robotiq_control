@@ -44,8 +44,6 @@ class RobotControlNode(Node):
         future = self.fk_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.result() is not None:
-            self.get_logger().info(f"FK response - position: {future.result().pose_stamped[0].pose.position}")
-            self.get_logger().info(f"FK response - orientation: {future.result().pose_stamped[0].pose.orientation}")
             return future.result()
         else:
             self.get_logger().error('Failed to call FK service')
@@ -55,15 +53,15 @@ class RobotControlNode(Node):
         request = GetPositionIK.Request()
         request.ik_request.group_name = 'panda_arm'
         request.ik_request.pose_stamped.header.frame_id = ''
-        request.ik_request.pose_stamped.pose.position = pose.position
-        request.ik_request.pose_stamped.pose.orientation = pose.orientation
+        request.ik_request.pose_stamped.pose.position = pose.pose.position
+        request.ik_request.pose_stamped.pose.orientation = pose.pose.orientation
         request.ik_request.robot_state.joint_state.name = ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
         request.ik_request.robot_state.joint_state.position = self.joint_state if self.joint_state else [0] * 7
 
         future = self.ik_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.result() is not None:
-            self.get_logger().info(f"IK response: {future.result()}")
+            self.get_logger().info(f"IK response - position: {future.result().solution.joint_state.position[0:7]}")
             return future.result()
         else:
             self.get_logger().error('Failed to call IK service')
@@ -94,10 +92,12 @@ def main(args=None):
 
     # Step 1: Get current joint positions from /joint_states
     joint_positions = node.joint_state  # /joint_states 토픽에서 받은 조인트 위치
-    print(joint_positions)
+    print("current joint positions: ", joint_positions)
 
     # Step 2: Call FK service
     fk_result = node.call_fk_service(joint_positions)
+    print("FK response - position: ", fk_result.pose_stamped[0].pose.position)
+    print("FK response - orientation: ", fk_result.pose_stamped[0].pose.orientation)
 
     # Step 3: Call IK service with new pose (example pose)
     pose = PoseStamped()
