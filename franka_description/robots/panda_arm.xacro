@@ -306,8 +306,9 @@
       </collision>
     </link>
     <joint name="${arm_id}_joint8" type="fixed">
-      <!--origin rpy="0 0 0" xyz="0 0 0.107"/-->
-      <origin rpy="0 0 0" xyz="0 0 0.257"/> <!-- panda_joint8 위치를 default에 대해 15cm offset -->
+      <!-- <origin rpy="0 0 0" xyz="0 0 0.107"/> -->
+      <!-- panda_joint8 위치를 default에 대해 15cm offset -->
+      <origin rpy="0 0 0" xyz="0 0 0.257"/> 
       <parent link="${arm_id}_link7"/>
       <child link="${arm_id}_link8"/>
     </joint>

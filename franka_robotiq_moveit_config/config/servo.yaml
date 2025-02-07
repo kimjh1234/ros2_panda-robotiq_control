@@ -1,0 +1,49 @@
+#####################################################################
+# MoveIt Servo 기본 설정 예시 (Panda + Robotiq 구성)
+#####################################################################
+
+move_group_name: panda_arm           # 서보로 제어할 MoveIt 그룹
+planning_frame: panda_link0          # 로봇 베이스 프레임
+
+command_in_type: "geometry_msgs/TwistStamped"
+# command_in_type: "geometry_msgs/PoseStamped" 로 하면 포즈제어 모드
+
+publish_joint_positions: false
+publish_joint_velocities: true       # Joint velocity 명령 퍼블리시
+publish_joint_accelerations: false
+use_gazebo: false                    # 시뮬레이션이면 true로
+
+# 로봇 관절 정보 (joint_state_publisher 등에서 가져오는 토픽)
+joint_topic: "/panda/joint_states"
+
+# 실제 velocity 명령을 보낼 토픽 (ros2_control에서 설정한 컨트롤러 토픽)
+publish_topic: "/panda/joint_trajectory_controller/joint_trajectory"
+
+#----------------------------------------------------
+# 아래부터는 주로 안전/속도 제한 및 충돌 감지 설정
+# (기본값이나 낮은 임계값부터 시작하여 필요시 조정)
+#----------------------------------------------------
+
+linear_scale: 0.1
+rotational_scale: 0.1
+
+scale:
+  linear: 0.1
+  rotational: 0.1
+
+lower_singularity_threshold: 0.15
+hard_stop_singularity_threshold: 0.05
+collision_check_rate: 10
+self_collision_proximity_threshold: 0.02
+scene_collision_proximity_threshold: 0.02
+
+#---------------------------------
+# 수신 명령이 없는 경우 타임아웃
+#---------------------------------
+incoming_command_timeout: 0.2  # 초 단위
+
+#---------------------------------
+# Servo 내부 주기
+#---------------------------------
+publish_rate: 100.0      # (Hz) 서보 노드가 로봇 명령을 퍼블리시하는 속도
+

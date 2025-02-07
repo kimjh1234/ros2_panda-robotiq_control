@@ -23,10 +23,10 @@
   <xacro:if value="$(arg robotiq_gripper)">
     <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro"/>
     <xacro:robotiq_gripper name="RobotiqGripperHardwareInterface" prefix="" parent="$(arg arm_id)_link8" use_fake_hardware="$(arg use_fake_hardware)" fake_sensor_commands="$(arg fake_sensor_commands)" include_ros2_control="false">
-	
-  <!-- connection between panda arm and robotiq gripper -->
-  <!-- origin xyz="0 0 0" rpy="0 0 -1.570796" / -->
-  <origin xyz="0 0 -0.15" rpy="0 0 -1.570796" /> <!-- panda_joint8 위치 offset에 대해 역방향으로 15cm 보정 -->
+	  <!-- connection between panda arm and robotiq gripper -->
+    <!-- <origin xyz="0 0 0" rpy="0 0 -1.570796"/> -->
+  <!-- panda_joint8 위치 offset에 대해 역방향으로 15cm 보정 -->
+      <origin xyz="0 0 -0.15" rpy="0 0 -1.570796"/>
     </xacro:robotiq_gripper>
   </xacro:if>
 

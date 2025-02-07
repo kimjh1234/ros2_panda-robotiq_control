@@ -1,12 +1,22 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import Node
+from launch.actions import OpaqueFunction, IncludeLaunchDescription, DeclareLaunchArgument
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import load_python_launch_file_as_module
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
+import launch_ros
+from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions import Node, SetParameter
+from launch.actions import ExecuteProcess
 from ament_index_python.packages import get_package_share_directory
-
 from moveit_configs_utils import MoveItConfigsBuilder
 import yaml
+from launch.actions import TimerAction
 
 def load_yaml(package_name, file_path):
     """
@@ -22,240 +32,229 @@ def load_yaml(package_name, file_path):
 
 def generate_launch_description():
 
-    # ---------------------
-    # 1) Launch Arguments
-    # ---------------------
-    declared_arguments = []
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "robot_ip",
-            default_value="192.168.0.4",
-            description="Robot IP address or hostname for the real/sim Franka Panda.",
-        )
-    )
-    # declare parameter for using gripper
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "use_gripper",
-            default_value="false",
-            description="Use gripper",
-        )
-    )
-    declared_arguments.append(
-        DeclareLaunchArgument(
-            "use_fake_hardware",
-            default_value="false",
-            description="Use fake hardware interface for testing (true/false).",
-        )
+    # declare parameter for using robot ip
+    robot_ip = DeclareLaunchArgument(
+        "robot_ip",
+        default_value="192.168.0.4",
+        description="Robot IP",
     )
 
-    # ---------------------
-    # 2) MoveIt Config
-    #    (팔 + 그리퍼 통합 URDF / SRDF)
-    # ---------------------
-    
+    # declare parameter for using gripper
+    use_gripper = DeclareLaunchArgument(
+        "use_gripper",
+        default_value="true",
+        description="Use gripper",
+    )
+
+    # declare parameter for using fake controller
+    use_fake_hardware = DeclareLaunchArgument(
+        "use_fake_hardware",
+        default_value="false", # default to fake hardware (Important: that user is explicit with intention of launching real hardware!)
+        description="Use fake hardware",
+    )
+
+
+
     # panda arm config
     moveit_config = (
-        MoveItConfigsBuilder(robot_name="panda", package_name="franka_robotiq_moveit_config")
-        .robot_description(file_path=get_package_share_directory("franka_robotiq_description") + "/urdf/robot.urdf.xacro",
-            mappings={
-                "robot_ip": LaunchConfiguration("robot_ip"),
-                " robotiq_gripper": LaunchConfiguration("use_gripper"),
-                " use_fake_hardware": LaunchConfiguration("use_fake_hardware"),
-                })
-        .robot_description_semantic("config/panda.srdf.xacro")
-         # kinematics, joint_limits, etc.
-        .robot_description_kinematics("config/kinematics.yaml")
-        .joint_limits(file_path="config/joint_limits.yaml")
-        .trajectory_execution(file_path="config/moveit_controllers.yaml")
-        .to_moveit_configs()
-        )
-        
-    # (예) ompl_planning.yaml 로드
-    ompl_planning_yaml = load_yaml("franka_robotiq_moveit_config", "config/ompl_planning.yaml")
+            MoveItConfigsBuilder(robot_name="panda", package_name="franka_robotiq_moveit_config")
+            .robot_description(file_path=get_package_share_directory("franka_robotiq_description") 
+                               + "/urdf/robot.urdf.xacro",
+                mappings={
+                    "robot_ip": LaunchConfiguration("robot_ip"),
+                    "robotiq_gripper": LaunchConfiguration("use_gripper"),
+                    "use_fake_hardware": LaunchConfiguration("use_fake_hardware"),
+                     })
+            .robot_description_semantic("config/panda.srdf.xacro")
+            .robot_description_kinematics("config/kinematics.yaml")
+            .joint_limits(file_path="config/joint_limits.yaml")
+            .to_moveit_configs()
+            )
 
-    # ---------------------
-    # 3) Panda ros2_control_node
-    #    - panda_controllers.yaml
-    #    - 통합 URDF도 가능하지만, 여기서는 "팔 부분"만 제어
-    #    - 하지만 질문 코드처럼 통합 URDF를 그대로 써도 됨
-    # ---------------------
+    # panda_control_node   
     panda_controller_config = os.path.join(
         get_package_share_directory("franka_robotiq_moveit_config"),
         "config",
         "panda_controllers.yaml",
     )
-    # 여기서는 질문 코드처럼 "moveit_config.robot_description" (통합 URDF) 사용
+
     panda_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        namespace="panda",
-        output="both",
-        parameters=[
-            moveit_config.robot_description,  # 통합이든, 팔만이든 URDF를 여기 파라미터로
-            panda_controller_config
-        ],
+        parameters=[moveit_config.robot_description, panda_controller_config],
+        output="screen",
+        namespace="panda"
     )
 
-    # Controller spawner (panda)
     load_panda_controllers = []
-    for ctrl_name in ["panda_jtc_controller", "panda_state_broadcaster"]:
-        load_panda_controllers.append(
+    for controller in [
+        'joint_trajectory_controller',
+        'joint_state_broadcaster',
+    ]:
+        load_panda_controllers += [
             ExecuteProcess(
-                cmd=[f"ros2 run controller_manager spawner {ctrl_name} -c /panda/controller_manager"],
+                cmd=["ros2 run controller_manager spawner {} -c /panda/controller_manager".format(controller)],
                 shell=True,
-                output="both",
+                output="screen",
             )
-        )
+        ]    
 
-    # (선택) panda_state_publisher - 질문 코드처럼 쓰려면:
-    panda_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        namespace="panda",
-        output="both",
-        parameters=[moveit_config.robot_description],
+    # robotiq_control_node
+    robotiq_xacro = os.path.join(
+            get_package_share_directory("robotiq_description"),
+            "urdf",
+            "robotiq_2f_85_gripper.urdf.xacro",
+            )
+
+    robot_description_content = Command(
+        [
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            robotiq_xacro,
+            " ",
+            "use_fake_hardware:=false",
+        ]
     )
 
-    # ---------------------
-    # 4) Robotiq ros2_control_node
-    #    - robotiq_controllers.yaml
-    # ---------------------
-    robotiq_controllers_yaml = os.path.join(
+    robotiq_description_param = {
+        "robot_description": launch_ros.parameter_descriptions.ParameterValue(
+            robot_description_content, value_type=str
+        )
+    }
+
+    robotiq_controller_config = os.path.join(
         get_package_share_directory("franka_robotiq_moveit_config"),
         "config",
         "robotiq_controllers.yaml",
     )
 
-    # 예: robotiq_2f_85_gripper.urdf.xacro (gripper만)
-    # 하지만 질문 코드처럼 굳이 별도 xacro를 다시 읽어서 param에 넣어도 됩니다.
-    # 아래는 질문의 형태를 유지한 예.
-    robotiq_xacro_path = os.path.join(
-        get_package_share_directory("robotiq_description"),  # 또는 franka_robotiq_description
-        "urdf",
-        "robotiq_2f_85_gripper.urdf.xacro",
-    )
-    robotiq_urdf_cmd = Command([
-        FindExecutable(name="xacro"), " ",
-        robotiq_xacro_path, " ",
-        "use_fake_hardware:=", LaunchConfiguration("use_fake_hardware"),
-    ])
-    robotiq_description_param = {"robot_description": robotiq_urdf_cmd}
-
     robotiq_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        namespace="robotiq",
+        parameters=[robotiq_description_param, robotiq_controller_config],
         output="screen",
-        parameters=[
-            robotiq_description_param,
-            robotiq_controllers_yaml,
-        ],
-    )
-
-    # Controller spawner (robotiq)
-    load_robotiq_controllers = []
-    for ctrl_name in ["robotiq_state_broadcaster", "robotiq_gripper_controller", "robotiq_activation_controller"]:
-        load_robotiq_controllers.append(
-            ExecuteProcess(
-                cmd=[f"ros2 run controller_manager spawner {ctrl_name} -c /robotiq/controller_manager"],
-                shell=True,
-                output="both",
-            )
-        )
-
-    # (선택) robotiq_state_publisher
-    robotiq_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
         namespace="robotiq",
-        name="robotiq_state_publisher",
-        output="both",
-        parameters=[robotiq_description_param],
     )
 
-    # ---------------------
-    # 5) MoveIt (move_group)
-    # ---------------------
+    load_robotiq_controllers = []
+    for controller in [
+        'robotiq_state_broadcaster',
+        'robotiq_gripper_controller',
+        'robotiq_activation_controller',
+    ]:
+        load_robotiq_controllers += [
+            ExecuteProcess(
+                cmd=["ros2 run controller_manager spawner {} -c /robotiq/controller_manager".format(controller)],
+                shell=True,
+                output="screen",
+            )
+        ]
+
+    # robot_state_publisher
+    robot_state_publisher = Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[moveit_config.robot_description],
+    )
+
+
+    # move group node 
+    ompl_planning_pipeline_config = {
+        'move_group': {
+            'planning_plugin': 'ompl_interface/OMPLPlanner',
+            'request_adapters': 'default_planner_request_adapters/AddTimeOptimalParameterization '
+                                'default_planner_request_adapters/ResolveConstraintFrames '
+                                'default_planner_request_adapters/FixWorkspaceBounds '
+                                'default_planner_request_adapters/FixStartStateBounds '
+                                'default_planner_request_adapters/FixStartStateCollision '
+                                'default_planner_request_adapters/FixStartStatePathConstraints',
+            'start_state_max_bounds_error': 0.1,
+        }
+    }    
+    ompl_planning_yaml = load_yaml("franka_robotiq_moveit_config", "config/ompl_planning.yaml")
+    ompl_planning_pipeline_config['move_group'].update(ompl_planning_yaml)
+
+    # Trajectory Execution Functionality
+    moveit_controllers_yaml = load_yaml(
+        'franka_robotiq_moveit_config', 'config/moveit_controllers.yaml'
+    )
+    trajectory_execution = {
+        'moveit_manage_controllers': True,
+        'trajectory_execution.allowed_execution_duration_scaling': 1.2,
+        'trajectory_execution.allowed_goal_duration_margin': 0.5,
+        'trajectory_execution.allowed_start_tolerance': 0.01,
+    }
+
+    planning_scene_monitor_parameters = {
+        'publish_planning_scene': True,
+        'publish_geometry_updates': True,
+        'publish_state_updates': True,
+        'publish_transforms_updates': True,
+        'joint_state_topic': ['/panda/joint_states', '/robotiq/joint_states'],
+    }
+
     move_group_node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        output="both",
+                package="moveit_ros_move_group",
+                executable="move_group",
+                output="screen",
+                parameters=[
+                    moveit_config.robot_description,            # 통합 URDF
+                    moveit_config.robot_description_semantic,   # SRDF
+                    moveit_config.robot_description_kinematics, # kinematics.yaml
+                    moveit_config.joint_limits,
+                    ompl_planning_pipeline_config,
+                    trajectory_execution,
+                    moveit_controllers_yaml,
+                    planning_scene_monitor_parameters,
+                ],
+                name="move_group",
+            )
+
+    # joint_state_publisher
+    joint_state_publisher = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        name='joint_state_publisher',
+        output='screen',
         parameters=[
-            moveit_config.robot_description,            # 통합 URDF
-            moveit_config.robot_description_semantic,   # SRDF
-            moveit_config.robot_description_kinematics, # kinematics.yaml
-            moveit_config.joint_limits,
-            ompl_planning_yaml,
-            moveit_config.trajectory_execution,
-        ],
-        name="move_group",
+                {'source_list': ['/panda/joint_states', '/robotiq/joint_states'],
+                 'rate': 30}],
     )
 
-    # ---------------------
-    # 6) robot_state_publisher (통합 URDF)
-    #    -> 중복 가능 (질문 코드와 동일하게)
-    # ---------------------
-    # 질문 코드엔 "combined_robot_state_pub"가 있음
-    # robot.urdf.xacro를 xacro로 변환해서 파라미터에 넣음
-    franka_xacro_file = os.path.join(
-        get_package_share_directory("franka_robotiq_description"),
-        "urdf",
-        "robot.urdf.xacro",
-    )
-    combined_robot_description_cmd = Command(
-        [FindExecutable(name='xacro'), ' ', franka_xacro_file, ' hand:=', "False",
-         ' robot_ip:=', "192.168.0.4", ' use_fake_hardware:=', "False",
-         ' fake_sensor_commands:=', "False"])
-    combined_robot_state_pub = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        name="robot_state_publisher",
-        output="both",
-        parameters=[{"robot_description": combined_robot_description_cmd}],
-    )
+    # rviz_node
+    rviz_file = os.path.join(get_package_share_directory('franka_robotiq_description'), 'rviz',
+                             'visualize_w_mp.rviz')
 
-    # ---------------------
-    # 7) RViz (MotionPlanning)
-    # ---------------------
-    rviz_file = os.path.join(
-        get_package_share_directory("franka_robotiq_description"),
-        "rviz",
-        "visualize.rviz",
-    )
+
     rviz_node = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        output="both",
-        arguments=["--display-config", rviz_file],
-        parameters=[
-            moveit_config.robot_description,
-            moveit_config.robot_description_semantic,
-        ],
-    )
-
-    # ---------------------
-    # LaunchDescription
-    # ---------------------
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['--display-config', rviz_file],
+            parameters=[
+                moveit_config.robot_description,
+                moveit_config.robot_description_semantic,
+                ompl_planning_pipeline_config,
+                moveit_config.robot_description_kinematics,
+                ],
+        )
+   
     return LaunchDescription(
-        declared_arguments
-        + [
-            # (3) Panda ros2_control
-            panda_control_node,
-            panda_state_publisher,  # 선택
-            # (4) Robotiq ros2_control
-            robotiq_control_node,
-            robotiq_state_publisher,  # 선택
-
-            # (5) MoveIt
-            move_group_node,
-
-            # (6) Combined RSP + (7) RViz
-            combined_robot_state_pub,
+        [
+            robot_ip,
+            use_gripper,
+            use_fake_hardware,
             rviz_node,
+            robot_state_publisher,
+            move_group_node,
+            panda_control_node,
+            robotiq_control_node,
+            joint_state_publisher,
         ]
         + load_panda_controllers
         + load_robotiq_controllers
-    )
+        )
+
 
